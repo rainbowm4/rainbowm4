@@ -1,5 +1,5 @@
 # RainbowM4
-This repository contains the official ARM Cortex-M4 implementation of NISTPQC signature finalist Rainbow. 
+This repository contains the official ARM Cortex-M4 implementation of [NISTPQC](https://csrc.nist.gov/Projects/post-quantum-cryptography/round-3-submissions) signature finalist Rainbow. 
 
 For details of the scheme please visit the [Rainbow website](https://www.pqcrainbow.org/). 
 
