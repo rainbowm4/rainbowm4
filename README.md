@@ -6,7 +6,7 @@ For details of the scheme please visit the [Rainbow website](https://www.pqcrain
 Submitters: 
 - Ming-shing Chen
 - Jintai Ding
-- [Matthias Kannwischer](https://kannwischer.eu)
+- [Matthias J. Kannwischer](https://kannwischer.eu)
 - Jacques Patarin
 - Albrecht Petzoldt
 - [Dieter Schmidt](https://homepages.uc.edu/~schmiddr/)
