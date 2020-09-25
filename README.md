@@ -1,4 +1,4 @@
-This repository contains the official ARM Cortex-M4 implementation of the [NISTPQC](https://csrc.nist.gov/Projects/post-quantum-cryptography/round-3-submissions) signature finalist Rainbow. For details of the scheme please visit the [Rainbow website](https://www.pqcrainbow.org/). 
+This repository contains the official ARM Cortex-M4 implementation of the [NISTPQC](https://csrc.nist.gov/Projects/post-quantum-cryptography/round-3-submissions) [signature finalist Rainbow](https://www.pqcrainbow.org/). For details of the scheme please visit the [Rainbow website](https://www.pqcrainbow.org/). 
 
 Submitters: 
 - Ming-shing Chen
@@ -19,7 +19,7 @@ It has
 1. [Results](#results)
 2. [Setup](#setup)
     1. [Connecting the board](#connecting-the-board)
-    2. [Flashing](#Flashing)
+    2. [Flashing](#flashing)
 3. [Running it](#running-it)
     1. [Building Binaries](#building-binaries)
     2. [Running Tests](#running-tests)
@@ -31,8 +31,6 @@ It has
 
 Our current implementation has the following performance on the Giant Gecko @ 16 MHz (averaged over 1000 executions).
 
-One can speed-up signing for Rainbow-Classic and Rainbow-Circumzenithal by precomputing the bitsliced secret key. For Rainbow-Compressed that is not possible. 
-
 | scheme           |             | key gen  | sign    | verify |
 | ---------------  | ----------- | -------- | ------- | ------ |
 | I-Classic        | w/o precomp.| 151 590k | 945k    | 236k   |
@@ -41,6 +39,9 @@ One can speed-up signing for Rainbow-Classic and Rainbow-Circumzenithal by preco
 | I-Circumzenithal | w/ precomp. | 166 969k | 764k    | 6 671k |
 | I-Compressed     | w/o precomp.| 167 035k | 77 812k | 6 671k |
 | I-Compressed     | w/ precomp. | --       | --      | --     |
+
+One can speed-up signing for Rainbow-Classic and Rainbow-Circumzenithal by precomputing the bitsliced secret key. For Rainbow-Compressed that is not possible. 
+
 
 # Setup 
 Firstly, recursively clone this repo: 
@@ -54,7 +55,7 @@ You may want to follow the more complete setup description of [EFM32-getting-sta
 As usual you will need the [arm-none-eabi toolchain](https://launchpad.net/gcc-arm-embedded) toolchain installed.
 For flashing binaries onto the board, you will need to install the [J-Link Software and Documentation Pack](https://www.segger.com/downloads/jlink/). After installing, make sure that `JLinkExe` is in your `PATH`.
 
-For using [host_unidiretional.py](./host_unidirectional.py) you will need [Python](https://www.python.org/download) and [pyserial](https://pypi.org/project/pyserial/). Alternatively, you can use [screen](https://www.gnu.org/software/screen/).
+For using the scripts you will need [Python](https://www.python.org/download) and [pyserial](https://pypi.org/project/pyserial/).
 
 If you are on Arch Linux, you can simply run the following and should be done:
 
@@ -68,6 +69,7 @@ On Ubuntu, you can install [pyserial](https://pypi.org/project/pyserial/) and [a
 sudo apt install gcc-arm-none-eabi python3-serial
 ```
 You will have to have to install the [J-Link .deb](https://www.segger.com/downloads/jlink/) manually.
+
 
 ## Connecting the board
 
@@ -85,7 +87,7 @@ Depending on your setup, you may also want to connect the `GND` pin .
 
 For the full pin-outs of the Giant Gecko's see Section 4 in the [User Guide](https://www.silabs.com/documents/public/user-guides/ug287-stk3701.pdf).
 
-# Flashing
+## Flashing
 
 The Giant Gecko comes with a [Segger J-Link debugger](https://www.segger.com/products/debug-probes/j-link/) that we use to flash binaries on the board.
 You can simply run
@@ -95,7 +97,7 @@ You can simply run
 ``` 
 e.g., 
 ```
-./flash.sh bin/
+./flash.sh bin/crypto_sign_rainbowI-classic_m4_test.bin
 ``` 
 to program the binary onto the board.
 For details see [flash.sh](flash.sh) and [flash.jlink](flash.jlink).
@@ -105,10 +107,11 @@ For details see [flash.sh](flash.sh) and [flash.jlink](flash.jlink).
 
 We implement the three level 1 parameter sets of rainbow: `rainbowI-classic`, `rainbowI-circumzenithal`, and `rainbowI-compressed`. 
 Unfortunately, the keys of the level 3 and level 5 parameter sets do not fit in the 512 KiB RAM of the Giant Gecko. 
-We implement two variants: With and without precomputation of the bitsliced secret key. It can be turned on with the flag `PRECOMPUTE_BITSLICING=1`. 
-It only affects the performance of signing of `rainbowI-classic` and`rainbowI-circumzenithal`. 
 
-## Building Binaries 
+We implement two variants: With and without precomputation of the bitsliced secret key. It can be turned on with the flag `PRECOMPUTE_BITSLICING=1`. 
+It only affects the performance of signing of `rainbowI-classic` and `rainbowI-circumzenithal`. 
+
+## Building Binaries c
 As a first test if your toolchain is correctly setup run the following two commans and check that you see binaries appearing in `bin/`
 
 ```
