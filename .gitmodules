@@ -1,0 +1,3 @@
+[submodule "efm32-base"]
+	path = efm32-base
+	url = https://github.com/ryankurte/efm32-base/
