@@ -1,5 +1,7 @@
 This repository contains the official ARM Cortex-M4 implementation of the [NISTPQC](https://csrc.nist.gov/Projects/post-quantum-cryptography/round-3-submissions) [signature finalist Rainbow](https://www.pqcrainbow.org/). For details of the scheme please visit the [Rainbow website](https://www.pqcrainbow.org/). 
 
+We are working on a paper that describes the details of this implementation, and will provide a reference here once it is available. 
+
 Submitters: 
 - Ming-shing Chen
 - Jintai Ding
