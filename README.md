@@ -51,6 +51,16 @@ Firstly, recursively clone this repo:
 git clone  --recurse-submodules https://github.com/rainbowm4/rainbowm4
 ```
 
+In case you got the code from the official code package submitted to NIST, you need to initialie the `efm32-base` submodule by 
+```
+git init                                                                        
+git submodule add https://github.com/ryankurte/efm32-base                          
+cd efm32-base                                                                      
+git checkout ac1c323d77782fd8f39940bcf5fd857a9a8327a8                              
+cd .. 
+```
+
+
 This code is based upon [pqm4](https://github.com/mupq/pqm4) and [EFM32-getting-started](https://github.com/mkannwischer/EFM32-getting-started). 
 You may want to follow the more complete setup description of [EFM32-getting-started](https://github.com/mkannwischer/EFM32-getting-started). 
 
