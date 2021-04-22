@@ -1,8 +1,13 @@
 This repository contains the official ARM Cortex-M4 implementation of the [NISTPQC](https://csrc.nist.gov/Projects/post-quantum-cryptography/round-3-submissions) [signature finalist Rainbow](https://www.pqcrainbow.org/). For details of the scheme please visit the [Rainbow website](https://www.pqcrainbow.org/). 
 
-We are working on a paper that describes the details of this implementation, and will provide a reference here once it is available. 
+The implementation is described in more detail in [this paper](https://kannwischer.eu/papers/2021_rainbowm4.pdf). 
 
-Submitters: 
+Authors of this M4 implementations: 
+- [Tung Chou](https://tungchou.github.io/)
+- [Matthias J. Kannwischer](https://kannwischer.eu)
+- [Bo-Yin Yang](https://www.iis.sinica.edu.tw/pages/byyang/)
+
+Rainbow Submitters: 
 - Ming-shing Chen
 - Jintai Ding
 - [Matthias J. Kannwischer](https://kannwischer.eu)
@@ -23,27 +28,17 @@ It has
     1. [Connecting the board](#connecting-the-board)
     2. [Flashing](#flashing)
 3. [Running it](#running-it)
-    1. [Building Binaries](#building-binaries)
-    2. [Running Tests](#running-tests)
-    3. [Comparing Testvectors](#comparing-testvectors)
-    4. [Comparing NIST KATs](#comparing-nist-kats)
-    5. [Running Benchmarks](#running-benchmarks)
+    1. [Parameter Sets](#parameter-sets)
+    2. [Implementations](#implementations)
+    3. [Programs](#programs)
+    4. [Hardware crypto](#hardware-crypto)
+    5. [Precomputation](#precomputation)
+    6. [Automated tests and benchmarks](#automated-tests-and-benchmarks)
+    7. [List of Binaries](#list-of-binaries)
 
 # Results 
 
-Our current implementation has the following performance on the Giant Gecko @ 16 MHz (averaged over 1000 executions).
-
-| scheme           |             | key gen  | sign    | verify |
-| ---------------  | ----------- | -------- | ------- | ------ |
-| I-Classic        | w/o precomp.| 151 590k | 945k    | 236k   |
-| I-Classic        | w/ precomp. | 151 590k | 767k    | 237k   |
-| I-Circumzenithal | w/o precomp.| 166 969k | 940k    | 6 670k |
-| I-Circumzenithal | w/ precomp. | 166 969k | 764k    | 6 671k |
-| I-Compressed     | w/o precomp.| 167 035k | 77 812k | 6 671k |
-| I-Compressed     | w/ precomp. | --       | --      | --     |
-
-One can speed-up signing for Rainbow-Classic and Rainbow-Circumzenithal by precomputing the bitsliced secret key. For Rainbow-Compressed that is not possible. 
-
+See Table 2 of the paper. 
 
 # Setup 
 Firstly, recursively clone this repo: 
@@ -116,74 +111,366 @@ For details see [flash.sh](flash.sh) and [flash.jlink](flash.jlink).
 
 
 # Running it 
+## Parameter Sets
+We implement the three level 1 parameter sets `rainbowI-classic`, `rainbowI-circumzenithal`, `rainbowI-compressed`.
 
-We implement the three level 1 parameter sets of rainbow: `rainbowI-classic`, `rainbowI-circumzenithal`, and `rainbowI-compressed`. 
-Unfortunately, the keys of the level 3 and level 5 parameter sets do not fit in the 512 KiB RAM of the Giant Gecko. 
+In addition, we include implementations using the alternative direct representation F_16 = F_2[X]/(X^4+X+1).
+These are called `rainbowI-classic-tweaked`, `rainbowI-circumzenithal-tweaked`, `rainbowI-compressed-tweaked`.
 
-We implement two variants: With and without precomputation of the bitsliced secret key. It can be turned on with the flag `PRECOMPUTE_BITSLICING=1`. 
-It only affects the performance of signing of `rainbowI-classic` and `rainbowI-circumzenithal`. 
-
-## Building Binaries c
-As a first test if your toolchain is correctly setup run the following two commans and check that you see binaries appearing in `bin/`
+You can select the parameter set in the binary name and implementation path, e.g., for `rainbowI-classic` run
 
 ```
-PRECOMPUTE_BITSLICING=0 python3 build_everything.py
-PRECOMPUTE_BITSLICING=1 python3 build_everything.py
-```
-## Running Tests
-You can test the schemes by running
-```
-PRECOMPUTE_BITSLICING=<0/1> python3 test.py <schemes> 
-```
-e.g., 
-```
-PRECOMPUTE_BITSLICING=0 ./test.py rainbowI-classic rainbowI-circumzenithal rainbowI-compressed
+make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
 ```
 
-Alternatively, you can also run `./run_tests.sh` to test all the parameter sets with and without precomputation.
+## Implementations
 
-## Comparing Testvectors
+This code package includes our new `m4` implementation, but also the reference implementation `ref` from the Rainbow submission package. 
+You can select the implementation in the binary name and the path, e.g., for the reference implementation, run
 
-One can cross check the implementations, by first running the reference implementation on the host and verifying that the output is the same as the one produced by our implementation. Simply run 
 ```
-PRECOMPUTE_BITSLICING=<0/1> python3 testvectors.py <schemes> 
-```
-e.g., 
-```
-PRECOMPUTE_BITSLICING=0 ./testvectors.py rainbowI-classic rainbowI-circumzenithal rainbowI-compressed
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_test.bin
 ```
 
-Alternatively, you can also run `./run_testvectors.sh` to test all the parameter sets with and without precomputation.
+## Programs
+We have different programs for different purposes:
+- [`test.c`](./crypto_sign/test.c): Tests if signatures verify correctly.
+- [`speed.c`](./crypto_sign/speed.c): Benchmarks the scheme at a low frequency (16 MHz) and outputs cycle counts.
+- [`testvectors.c`](./crypto_sign/testvectors.c): Generates deterministic testvectors which can be used to cross check different implementations.
+- [`nistkat.c`](./crypto_sign/nistkat.c): Uses the same deterministic RNG that was provided by NIST which allows to compare to NISTKATs.
+- [`stack.c`](./crypto_sign/stack.c): Measures the stack consumption of the implementations.
+- [`hashing.c`](./crypto_sign/hashing.c): Profiles how much of the run time is spent in hashing operations.
 
-## Comparing NIST KATs
-
-The SHA3-256 hashes of first testvector of the KATs submitted to NIST are
-
-| scheme           | SHA3-256                                                         | 
-| ---------------  | ---------------------------------------------------------------- | 
-| I-Classic        | FF67670FFF15986BE86C54A34B1165A13F56D58E466130E32AB506CC4CEC74F5 |
-| I-Circumzenithal | 49A37441B239466E8032FFF7688C8FE5D7FDABEF80007F7E043E18DE8C6AD4D6 |
-| I-Compressed     | FFF9A0286EBA8433A8240B86BBD255856FD50927AA35F8E15EF5003134CC231F |
-
-Run `./run_nistkat.sh` to check that the M4 implementation produces the same testvectors. 
-
-
-## Running Benchmarks 
-To benchmark the schemes use the scripts provided, e.g., 
+When building, those can be selected in the binary name, e.g., for test, run
 ```
-python3 benchmark.py <scheme> <precompute> <iterations>
+make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
 ```
-e.g., 
-```
-python3 benchmark.py rainbowI-classic 1 100
-```
-The `iterations` argument allows to specify how often signing and verification will be run. Due to the vast differences in run-time, it makes sense to average those over many iterations. 
 
-You may also use the provided scripts 
+## Hardware crypto
+
+The Giant Gecko has hardware support for AES and SHA256. We have included a variant of our implementation that uses
+the hardware accelerator.
+You can enable/disable it by setting the `USE_HARDWARE_CRYPTO` flag, e.g.,
+
 ```
-./run_benchmark_classic.sh
-./run_benchmark_classic_precomp.sh
-./run_benchmark_circumzenithal.sh
-./run_benchmark_circumzenithal_precomp.sh
-./run_benchmark_compressed.sh
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
+```
+
+By default, it is disabled (0).
+
+## Precomputation
+
+Rainbow signing (for classic and circumzenithal) can be speed-up by pre-computing the bitslicing of the secret key.
+The pre-computation can be enabled by using the `PRECOMPUTE_BITSLICING` flag, e.g.,
+```
+PRECOMPUTE_BITSLICING=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
+```
+
+By default, it is disabled (0).
+
+
+## Automated tests and benchmarks 
+The above options can all be combined.
+To verify that all implementations produce the same testvestors as the reference implementations, you can run 
+```
+./nistkat.py
+```
+
+For running benchmarks, we provide scripts as well
+```
+# speed benchmarks
+./run_all_benchmarks.py
+# hashing benchmarks
+./run_all_hashing_bench.py
+# stack benchmarks
+./run_all_stack.py
+# code size benchmarks
+./run_codesize.py
+```
+
+
+
+## List of binaries
+Below is a exhaustive list of the commands building the useful binaries.
+
+```
+# original parameter sets
+# test
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_test.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_test.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_test.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_test.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_test.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_test.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_test.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_test.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_test.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_test.bin
+
+# speed
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_speed.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_speed.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_speed.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_speed.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_speed.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_speed.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_speed.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_speed.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_speed.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_speed.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_speed.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_speed.bin
+
+
+# testvectors
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_testvectors.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_testvectors.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_testvectors.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_testvectors.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_testvectors.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_testvectors.bin
+
+# nistkat
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_nistkat.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_nistkat.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_nistkat.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_nistkat.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_nistkat.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_nistkat.bin
+
+# stack
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_stack.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_stack.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_stack.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_stack.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_stack.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_stack.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_stack.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_stack.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_stack.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_stack.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_stack.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_stack.bin
+
+# hashing
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_hashing.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_hashing.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_hashing.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/ref bin/crypto_sign_rainbowI-classic_ref_hashing.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/ref bin/crypto_sign_rainbowI-circumzenithal_ref_hashing.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/ref bin/crypto_sign_rainbowI-compressed_ref_hashing.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_hashing.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed/m4 bin/crypto_sign_rainbowI-compressed_m4_hashing.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_hashing.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_hashing.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_hashing.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal/m4 bin/crypto_sign_rainbowI-circumzenithal_m4_hashing.bin
+
+# tweaked parameter sets (direct F_16 presentation)
+# test
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_test.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_test.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_test.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_test.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_test.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_test.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_test.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_test.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_test.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_test.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_test.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_test.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_test.bin
+
+# speed
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_speed.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_speed.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_speed.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_speed.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_speed.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_speed.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_speed.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_speed.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_speed.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_speed.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_speed.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_speed.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_speed.bin
+
+
+# testvectors
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_testvectors.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_testvectors.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_testvectors.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_testvectors.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_testvectors.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_testvectors.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_testvectors.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_testvectors.bin
+
+# nistkat
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_nistkat.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_nistkat.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_nistkat.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_nistkat.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_nistkat.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_nistkat.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_nistkat.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_nistkat.bin
+
+# stack
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_stack.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_stack.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_stack.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_stack.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_stack.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_stack.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_stack.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_stack.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_stack.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_stack.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_stack.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_stack.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_stack.bin
+
+# hashing
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_hashing.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_hashing.bin
+USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_hashing.bin
+
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/ref bin/crypto_sign_rainbowI-classic-tweaked_ref_hashing.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/ref bin/crypto_sign_rainbowI-circumzenithal-tweaked_ref_hashing.bin
+USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/ref bin/crypto_sign_rainbowI-compressed-tweaked_ref_hashing.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_hashing.bin
+
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_hashing.bin
+PRECOMPUTE_BITSLICING=0 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-compressed-tweaked/m4 bin/crypto_sign_rainbowI-compressed-tweaked_m4_hashing.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_hashing.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=0 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_hashing.bin
+
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic-tweaked/m4 bin/crypto_sign_rainbowI-classic-tweaked_m4_hashing.bin
+PRECOMPUTE_BITSLICING=1 USE_HARDWARE_CRYPTO=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-circumzenithal-tweaked/m4 bin/crypto_sign_rainbowI-circumzenithal-tweaked_m4_hashing.bin
 ```
