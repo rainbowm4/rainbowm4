@@ -1,20 +1,23 @@
-#ifndef _BLAS_H_
-#define _BLAS_H_
 /// @file blas.h
-/// @brief Functions for implementing basic linear algebra functions.
+/// @brief Defining the implementations for linear algebra functions depending on the machine architecture.
 ///
 
-#include "rainbow_config.h"
-#include <stddef.h>
-#include <stdint.h>
+#ifndef _BLAS_H_
+#define _BLAS_H_
 
-void gf256v_predicated_add(uint8_t *accu_b, uint8_t predicate, const uint8_t *a, size_t _num_byte);
-void gf256v_add(uint8_t *accu_b, const uint8_t *a, size_t _num_byte);
+#ifndef _BLAS_UNIT_LEN_
+#define _BLAS_UNIT_LEN_ 4
+#endif
 
+#include "blas_u32.h"
 
-void gf16v_madd(uint8_t *accu_c, const uint8_t *a, uint8_t gf16_b, size_t _num_byte);
-void gf16v_mul_scalar(uint8_t *a, uint8_t gf16_b, size_t _num_byte);
-uint8_t gf16v_dot(const uint8_t *a, const uint8_t *b, size_t _num_byte);
+#define gf16v_mul_scalar _gf16v_mul_scalar_u32
+#define gf16v_madd _gf16v_madd_u32
 
+#define gf256v_add _gf256v_add_u32
+#define gf256v_conditional_add _gf256v_conditional_add_u32
+
+#include "blas_comm.h"
+#include "blas_matrix.h"
 
 #endif // _BLAS_H_

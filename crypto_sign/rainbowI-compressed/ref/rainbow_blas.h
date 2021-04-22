@@ -16,7 +16,6 @@
 #define gfv_madd gf16v_madd
 
 #define gfmat_prod gf16mat_prod
-#define gfmat_inv gf16mat_inv
 
 #define batch_trimat_madd batch_trimat_madd_gf16
 #define batch_trimatTr_madd batch_trimatTr_madd_gf16
@@ -28,5 +27,8 @@
 #define batch_quad_trimat_eval batch_quad_trimat_eval_gf16
 #define batch_quad_recmat_eval batch_quad_recmat_eval_gf16
 
+
+#define gfmat_inv       gf16mat_inv_32x32
+#define gfmat_solve_linear_eq       gf16mat_solve_linear_eq_32x32
 
 #endif // _RAINBOW_BLAS_H_

@@ -6,10 +6,19 @@
 #include "utils_hash.h"
 #include "rainbow_config.h"
 #include "sha2.h"
+#if USE_HARDWARE_CRYPTO == 1
+#include "hal-sha2.h"
+#endif
+
 
 static inline int _hash(unsigned char *digest, const unsigned char *m, size_t mlen) {
     #if 32 == _HASH_LEN
+
+    #if USE_HARDWARE_CRYPTO == 0
     sha256(digest, m, mlen);
+    #else
+    hal_sha256(digest, m, mlen);
+    #endif
     #elif 48 == _HASH_LEN
     sha384(digest, m, mlen);
     #elif 64 == _HASH_LEN

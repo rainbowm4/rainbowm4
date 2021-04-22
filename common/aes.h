@@ -11,15 +11,12 @@
 #define AES_BLOCKBYTES 16
 
 typedef struct {
-    uint64_t sk_exp[88];
+    uint32_t sk_exp[2*11*AES_BLOCKBYTES/sizeof(uint32_t)];
 } aes128ctx;
 
-typedef struct {
-    uint64_t sk_exp[104];
-} aes192ctx;
 
 typedef struct {
-    uint64_t sk_exp[120];
+    uint32_t sk_exp[2*15*AES_BLOCKBYTES/sizeof(uint32_t)];
 } aes256ctx;
 
 
@@ -34,17 +31,6 @@ void aes128_ecb(unsigned char *out, const unsigned char *in, size_t nblocks, con
 void aes128_ctr(unsigned char *out, size_t outlen, const unsigned char *iv, const aes128ctx *ctx);
 
 void aes128_ctx_release(aes128ctx *r);
-
-/** Initializes the context **/
-void aes192_ecb_keyexp(aes192ctx *r, const unsigned char *key);
-
-void aes192_ctr_keyexp(aes192ctx *r, const unsigned char *key);
-
-void aes192_ecb(unsigned char *out, const unsigned char *in, size_t nblocks, const aes192ctx *ctx);
-
-void aes192_ctr(unsigned char *out, size_t outlen, const unsigned char *iv, const aes192ctx *ctx);
-
-void aes192_ctx_release(aes192ctx *r);
 
 
 /** Initializes the context **/

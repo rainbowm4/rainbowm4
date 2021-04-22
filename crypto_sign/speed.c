@@ -45,12 +45,12 @@ int main(void)
   // Key-pair generation
   t0 = hal_get_time();
   MUPQ_crypto_sign_keypair(pk, sk);
-  t1 = hal_get_time();
-  printcycles("keypair cycles:", t1-t0);
-
   #if PRECOMPUTE_BITSLICING == 1
   bitslice_sk(sk);
   #endif
+
+  t1 = hal_get_time();
+  printcycles("keypair cycles:", t1-t0);
 
 
   for(int i = 0; i < CRYPTO_ITERATIONS; i++){

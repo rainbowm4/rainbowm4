@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define MLEN 32
-#define MAX_SIZE 0x1B000
+#define MAX_SIZE 0x50000
 // https://stackoverflow.com/a/1489985/1711232
 #define PASTER(x, y) x####y
 #define EVALUATOR(x, y) PASTER(x, y)
@@ -64,6 +64,11 @@ static int test_sign(void) {
   if(c >= canary_size) return -1;
   stack_key_gen = c;
 
+  #if PRECOMPUTE_BITSLICING == 1
+  bitslice_sk(sk);
+  #endif
+
+
   // Bob derives a secret key and creates a response
   randombytes(m, MLEN);
   FILL_STACK()
@@ -95,12 +100,16 @@ int main(void) {
 
  // marker for automated benchmarks
   hal_send_str("==========================");
-  canary_size = 0x1000;
+  canary_size = 0x3D000;
   while(test_sign()){
     canary_size += 0x1000;
     if(canary_size >= MAX_SIZE) {
       hal_send_str("failed to measure stack usage.\n");
       break;
+    } else {
+      char str[100];
+      sprintf(str, "trying again with %d byte canary", canary_size);
+      hal_send_str(str);
     }
   }
 

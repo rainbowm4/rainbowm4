@@ -20,11 +20,16 @@ ifndef PRECOMPUTE_BITSLICING
 PRECOMPUTE_BITSLICING=0
 endif
 
+ifndef USE_HARDWARE_CRYPTO
+USE_HARDWARE_CRYPTO=0
+endif
+
 CFLAGS += -O3 \
           -Wall -Wextra -Wimplicit-function-declaration \
           -Wredundant-decls -Wmissing-prototypes -Wstrict-prototypes \
           -Wundef -Wshadow \
-          -fno-common $(ARCH_FLAGS) -MD $(DEFINES) $(INCLUDES) -DCRYPTO_ITERATIONS=$(CRYPTO_ITERATIONS) -DPRECOMPUTE_BITSLICING=$(PRECOMPUTE_BITSLICING)
+		  -ffunction-sections -fdata-sections \
+          -fno-common $(ARCH_FLAGS) -MD $(DEFINES) $(INCLUDES) -DCRYPTO_ITERATIONS=$(CRYPTO_ITERATIONS) -DPRECOMPUTE_BITSLICING=$(PRECOMPUTE_BITSLICING) -DUSE_HARDWARE_CRYPTO=$(USE_HARDWARE_CRYPTO)
 
 EFM32GG11BOBJ    = GCC/startup_efm32gg11b.o system_efm32gg11b.o
 LIBEFM32GG11BOBJ = $(addprefix build/efm32-base/device/EFM32GG11B/Source/,$(EFM32GG11BOBJ))
@@ -35,7 +40,7 @@ EMLIBOBJ = $(addprefix build/,$(EMLIBSRC:.c=.o))
 EMLIB    = build/efm32-base/emlib/emlib.a
 
 LDSCRIPT = efm32-base/device/EFM32GG11B/Source/GCC/efm32gg11b.ld
-LDFLAGS  =  $(ARCH_FLAGS) -fno-builtin -ffunction-sections -fdata-sections \
+LDFLAGS  =  $(ARCH_FLAGS) -Wl,--gc-sections -fno-builtin -ffunction-sections -fdata-sections \
            -fomit-frame-pointer -T$(LDSCRIPT) -lgcc -lc -lnosys -lm \
            $(LIBEFM32GG11B) $(EMLIB)
 
@@ -50,7 +55,7 @@ TYPE=kem
 
 COMMONSOURCES=common/fips202.c common/sp800-185.c common/nistseedexpander.c
 COMMONSOURCES_HOST=$(COMMONSOURCES) common/keccakf1600.c common/aes-ref.c  common/sha2-ref.c  common/sha2.c
-COMMONSOURCES_M4=$(COMMONSOURCES) common/keccakf1600.S common/aes.c common/aes.S common/sha2.c common/crypto_hashblocks_sha512.c common/crypto_hashblocks_sha512_inner32.s
+COMMONSOURCES_M4=$(COMMONSOURCES) common/keccakf1600.S common/aes.c common/aes-encrypt.S common/aes-keyschedule.S common/sha2.c common/crypto_hashblocks_sha512.c common/crypto_hashblocks_sha512_inner32.s common/hal-efm32gg.c common/hal-efm32gg-aes.c common/hal-efm32gg-sha2.c
 
 COMMONINCLUDES=-I"common"
 COMMONINCLUDES_M4=$(COMMONINCLUDES)
@@ -67,13 +72,9 @@ IMPLEMENTATION_HEADERS = $(IMPLEMENTATION_PATH)/*.h
 
 
 .PHONY: all
-all:
-	@echo "Please use the scripts in this directory instead of using the Makefile"
-	@echo
-	@echo "If you really want to use it, please specify IMPLEMENTATION_PATH=path/to/impl"
-	@echo "and a target binary, e.g.,"
-	@echo "make IMPLEMENTATION_PATH=crypto_kem/kyber768/m4 bin/crypto_kem_kyber768_m4_test.bin"
-	@echo "make clean also works"
+all: lib
+	@echo "Missing arguments. Specify IMPLEMENTATION_PATH and a target binary, e.g.,"
+	@echo "make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbowI-classic_m4_test.bin"
 
 $(DEST_HOST)/%_testvectors: $(COMMONSOURCES_HOST) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS)
 	mkdir -p $(DEST_HOST)
@@ -91,29 +92,35 @@ $(DEST)/%.bin: elf/%.elf
 	$(OBJCOPY) -Obinary $^ $@
 
 
-elf/$(TARGET_NAME)_%.elf: crypto_$(TYPE)/%.c $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) common/hal-efm32gg.c 
+elf/$(TARGET_NAME)_%.elf: crypto_$(TYPE)/%.c $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) lib
 	mkdir -p elf
 	$(CC) -o $@ $(CFLAGS) -DMUPQ_NAMESPACE=$(MUPQ_NAMESPACE) \
-		$< $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) common/hal-efm32gg.c \
+		$< $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) \
 		-I$(IMPLEMENTATION_PATH) $(COMMONINCLUDES_M4) $(LDFLAGS)
 
 
-elf/$(TARGET_NAME)_testvectors.elf: crypto_$(TYPE)/testvectors.c $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) common/hal-efm32gg.c
+elf/$(TARGET_NAME)_testvectors.elf: crypto_$(TYPE)/testvectors.c $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) lib
 	mkdir -p elf
 	$(CC) -o $@ $(CFLAGS) -DMUPQ_NAMESPACE=$(MUPQ_NAMESPACE)\
-		$< $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) common/hal-efm32gg.c \
+		$< $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) \
 		-I$(IMPLEMENTATION_PATH) $(COMMONINCLUDES_M4) $(LDFLAGS)
 
-elf/$(TARGET_NAME)_nistkat.elf: crypto_$(TYPE)/nistkat.c $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) common/hal-efm32gg.c
+elf/$(TARGET_NAME)_codesize.elf: crypto_$(TYPE)/codesize.c $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) lib
+	mkdir -p elf
+	$(CC) -o $@ $(CFLAGS) -DMUPQ_NAMESPACE=$(MUPQ_NAMESPACE) \
+		$< $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) \
+		-I$(IMPLEMENTATION_PATH) $(COMMONINCLUDES_M4) $(LDFLAGS) -DINCLUDE_KEYGEN=$(INCLUDE_KEYGEN) -DINCLUDE_SIGN=$(INCLUDE_SIGN) -DINCLUDE_VERIFY=$(INCLUDE_VERIFY) -DINCLUDE_AES=$(INCLUDE_AES) -DINCLUDE_SHA2=$(INCLUDE_SHA2)
+
+elf/$(TARGET_NAME)_nistkat.elf: crypto_$(TYPE)/nistkat.c $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) lib
 	mkdir -p elf
 	$(CC) -o $@ $(CFLAGS) -DMUPQ_NAMESPACE=$(MUPQ_NAMESPACE)\
-		$< $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) common/hal-efm32gg.c \
+		$< $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) \
 		-I$(IMPLEMENTATION_PATH) $(COMMONINCLUDES_M4) $(LDFLAGS)
 
-elf/$(TARGET_NAME)_hashing.elf: crypto_$(TYPE)/hashing.c $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) common/hal-efm32gg.c
+elf/$(TARGET_NAME)_hashing.elf: crypto_$(TYPE)/hashing.c $(COMMONSOURCES_M4) $(IMPLEMENTATION_SOURCES) $(IMPLEMENTATION_HEADERS) $(EMLIB) $(LIBEFM32GG11B) lib
 	mkdir -p elf
 	$(CC) -o $@ $(CFLAGS) -DPROFILE_HASHING -DMUPQ_NAMESPACE=$(MUPQ_NAMESPACE) \
-		$< $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) common/hal-efm32gg.c \
+		$< $(COMMONSOURCES_M4) $(RANDOMBYTES_M4) $(IMPLEMENTATION_SOURCES) \
 		-I$(IMPLEMENTATION_PATH) $(COMMONINCLUDES_M4) $(LDFLAGS)
 
 obj/$(TARGET_NAME)_%.o: $(IMPLEMENTATION_PATH)/%.c $(IMPLEMENTATION_HEADERS)
@@ -146,6 +153,19 @@ build/%.o: %.c
 	mkdir -p $(@D)
 	$(CC) -o $@ -c $(CFLAGS) $<
 
+
+lib:
+	@if [ ! -d efm32-base ] ; then \
+		printf "######## ERROR ########\n"; \
+		printf "\tefm32-base not found.\n"; \
+		printf "\tPlease run :\n"; \
+		printf "\t$$ git clone https://github.com/ryankurte/efm32-base\n"; \
+		printf "\t$$ cd efm32-base && git checkout ac1c323 && cd ..\n"; \
+		printf "\tbefore running make.\n"; \
+		printf "######## ERROR ########\n"; \
+		exit 1; \
+		fi
+
 .PHONY: clean libclean
 clean:
 	rm -rf elf/
@@ -154,6 +174,7 @@ clean:
 	rm -rf obj/
 	rm -rf testvectors/
 	rm -rf benchmarks/
+	rm -rf build
 
 libclean:
 	rm -rf build/
