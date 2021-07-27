@@ -8,7 +8,7 @@ Authors of this M4 implementations:
 - [Bo-Yin Yang](https://www.iis.sinica.edu.tw/pages/byyang/)
 
 Rainbow Submitters: 
-- Ming-shing Chen
+- Ming-Shing Chen
 - Jintai Ding
 - [Matthias J. Kannwischer](https://kannwischer.eu)
 - Jacques Patarin
