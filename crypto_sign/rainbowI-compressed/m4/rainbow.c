@@ -19,7 +19,6 @@
 
 #include "utils_prng.h"
 #include "utils_hash.h"
-#include "utils_malloc.h"
 
 #define MAX_ATTEMPT_FRMAT 128
 

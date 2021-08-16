@@ -13,7 +13,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "utils_malloc.h"
 
 ////////////////////////////////////////////////////////////////
 
@@ -215,7 +214,7 @@ void calculate_Q_from_F_ref( ext_cpk_t * Qs, const sk_t * Fs , const sk_t * Ts )
 #if ( _O1_BYTE*_O2*_O2 > _SIZE_TEMPQ )||( _O2_BYTE*_O1*_O1 > _SIZE_TEMPQ )||( _O2_BYTE*_O2*_O2 > _SIZE_TEMPQ )
 error: incorrect buffer size.
 #endif
-    unsigned char _ALIGN_(32) tempQ[_SIZE_TEMPQ];
+    unsigned char tempQ[_SIZE_TEMPQ];
 
     memset( tempQ , 0 , _O1_BYTE * _O1 * _O1 );   // l1_Q5
     batch_matTr_madd( tempQ , Ts->t1 , _V1, _V1_BYTE, _O1, Qs->l1_Q2, _O1, _O1_BYTE );  // t1_tr*(F1*T1 + F2)
@@ -339,7 +338,7 @@ void calculate_F_from_Q_ref( sk_t * Fs , const sk_t * Qs , sk_t * Ts )
     memcpy( Fs->l2_F2 , Qs->l2_F2 , _O2_BYTE * _V1*_O1 );
     batch_trimat_madd( Fs->l2_F2 , Qs->l2_F1 , Ts->t1 , _V1, _V1_BYTE , _O1, _O2_BYTE );    // Q1_T1+ Q2
 
-    unsigned char _ALIGN_(32) tempQ[_O1*_O1*_O2_BYTE] = {0};
+    unsigned char tempQ[_O1*_O1*_O2_BYTE] = {0};
     batch_matTr_madd( tempQ , Ts->t1 , _V1, _V1_BYTE, _O1, Fs->l2_F2, _O1, _O2_BYTE );     // t1_tr*(Q1_T1+Q2)
     memcpy( Fs->l2_F5, Qs->l2_F5, _O2_BYTE * N_TRIANGLE_TERMS(_O1) );                      // F5
     UpperTrianglize( Fs->l2_F5 , tempQ , _O1, _O2_BYTE );                                  // UT( ... )
@@ -376,12 +375,12 @@ void calculate_Q_from_F_cyclic_ref( cpk_t * Qs, const sk_t * Fs , const sk_t * T
     const unsigned char * t2 = Ts->t4;
 
 #define _SIZE_BUFFER_F2 (_O1_BYTE * _V1 * _O1)
-    unsigned char _ALIGN_(32) buffer_F2[_SIZE_BUFFER_F2];
+    unsigned char buffer_F2[_SIZE_BUFFER_F2];
     memcpy( buffer_F2 , Fs->l1_F2 , _O1_BYTE * _V1 * _O1 );
     batch_trimat_madd( buffer_F2 , Fs->l1_F1 , Ts->t1 , _V1, _V1_BYTE , _O1, _O1_BYTE );      // F1*T1 + F2
 
 #define _SIZE_BUFFER_F3 (_O1_BYTE * _V1 * _O2)
-    unsigned char _ALIGN_(32) buffer_F3[_SIZE_BUFFER_F3];
+    unsigned char buffer_F3[_SIZE_BUFFER_F3];
     memset( buffer_F3 , 0 , _O1_BYTE * _V1 * _O2 );
     batch_matTr_madd( buffer_F3 , Ts->t1 , _V1, _V1_BYTE, _O1, buffer_F2, _O1, _O1_BYTE );  // T1tr*(F1*T1 + F2) , release buffer_F2
     memset( Qs->l1_Q5 , 0 , _O1_BYTE * N_TRIANGLE_TERMS(_O1) );

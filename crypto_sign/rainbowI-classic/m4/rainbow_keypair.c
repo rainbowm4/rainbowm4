@@ -20,8 +20,6 @@
 
 
 #include "utils_prng.h"
-#include "utils_malloc.h"
-
 
 static
 void generate_S_T( unsigned char * s_and_t , prng_t * prng0 )
@@ -421,7 +419,7 @@ void generate_keypair_cyclic( cpk_t * pk, sk_t* sk, const unsigned char *pk_seed
     prng_set( prng0 , sk_seed , LEN_SKSEED );
     generate_S_T( sk->s1 , prng0 );   // S,T:  only a part of sk
 
-    unsigned char _ALIGN_(32) t2[sizeof(sk->t4)];
+    unsigned char t2[sizeof(sk->t4)];
     // align space with pointer arithmetic
     //unsigned char _t2[sizeof(sk->t4)+32];
     //unsigned char * t2 = _t2 + (32-(   ((uint64_t)(&_t2[0])) &31));
@@ -440,7 +438,7 @@ void generate_keypair_cyclic( cpk_t * pk, sk_t* sk, const unsigned char *pk_seed
 
     calculate_F_from_Q( sk , Qs , sk );          // calcuate the rest parts of secret key from Qs and S,T
 
-    unsigned char _ALIGN_(32) t4[sizeof(sk->t4)];
+    unsigned char t4[sizeof(sk->t4)];
     // align space with pointer arithmetic
     //unsigned char _t4[sizeof(sk->t4)+32];
     //unsigned char * t4 = _t4 + (32-(  ((uint64_t)(&_t4[0]))  &31));
