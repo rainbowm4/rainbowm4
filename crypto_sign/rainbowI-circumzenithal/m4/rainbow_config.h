@@ -11,7 +11,7 @@
 
 
 #define _USE_MEMORY_SAVE_
-
+#define _ALIGN_(x)  __attribute__((aligned(x)))
 /// the defined parameter
 #if (!defined(_RAINBOW16_32_32_32))&&(!defined(_RAINBOW256_68_36_36))&&(!defined(_RAINBOW256_92_48_48))
 //#define _RAINBOW16_32_32_32

@@ -20,8 +20,6 @@
 
 
 #include "utils_prng.h"
-#include "utils_malloc.h"
-
 
 static
 void generate_S_T( unsigned char * s_and_t , prng_t * prng0 )
