@@ -1,13 +1,13 @@
-This repository contains the official ARM Cortex-M4 implementation of the [NISTPQC](https://csrc.nist.gov/Projects/post-quantum-cryptography/round-3-submissions) [signature finalist Rainbow](https://www.pqcrainbow.org/). For details of the scheme please visit the [Rainbow website](https://www.pqcrainbow.org/). 
+This repository contains the official ARM Cortex-M4 implementation of the [NISTPQC](https://csrc.nist.gov/Projects/post-quantum-cryptography/round-3-submissions) [signature finalist Rainbow](https://www.pqcrainbow.org/). For details of the scheme please visit the [Rainbow website](https://www.pqcrainbow.org/).
 
-The implementation is described in more detail in [this paper](https://kannwischer.eu/papers/2021_rainbowm4.pdf). 
+The implementation is described in more detail in [this paper](https://kannwischer.eu/papers/2021_rainbowm4.pdf).
 
-Authors of this M4 implementations: 
+Authors of this M4 implementations:
 - [Tung Chou](https://tungchou.github.io/)
 - [Matthias J. Kannwischer](https://kannwischer.eu)
 - [Bo-Yin Yang](https://www.iis.sinica.edu.tw/pages/byyang/)
 
-Rainbow Submitters: 
+Rainbow Submitters:
 - Ming-Shing Chen
 - Jintai Ding
 - [Matthias J. Kannwischer](https://kannwischer.eu)
@@ -17,7 +17,7 @@ Rainbow Submitters:
 - [Bo-Yin Yang](https://www.iis.sinica.edu.tw/pages/byyang/)
 
 We target the [EFM32GG11 Giant Gecko Starter Kit](https://www.silabs.com/development-tools/mcu/32-bit/efm32gg11-starter-kit) which has a [EFM32GG11B820F2048GL192](https://www.silabs.com/mcu/32-bit/efm32-giant-gecko-gg11/device.efm32gg11b820f2048gl192) Cortex-M4 core.
-It has 
+It has
 - 515 KiB RAM
 - 2 MiB Flash
 - runs at at most 72 MHz
@@ -36,30 +36,30 @@ It has
     6. [Automated tests and benchmarks](#automated-tests-and-benchmarks)
     7. [List of Binaries](#list-of-binaries)
 
-# Results 
+# Results
 
-See Table 2 of the paper. 
+See Table 2 of the paper.
 
-# Setup 
-Firstly, recursively clone this repo: 
+# Setup
+Firstly, recursively clone this repo:
 ```
 git clone  --recurse-submodules https://github.com/rainbowm4/rainbowm4
 ```
 
-In case you got the code from the official code package submitted to NIST, you need to initialie the `efm32-base` submodule by 
+In case you got the code from the code package submitted to NIST or the TCHES artifact, you need to initialize the `efm32-base` submodule by
 ```
-git init                                                                        
-git submodule add https://github.com/ryankurte/efm32-base                          
-cd efm32-base                                                                      
-git checkout ac1c323d77782fd8f39940bcf5fd857a9a8327a8                              
-cd .. 
+git init
+git submodule add https://github.com/ryankurte/efm32-base
+cd efm32-base
+git checkout ac1c323d77782fd8f39940bcf5fd857a9a8327a8
+cd ..
 ```
 
 
-This code is based upon [pqm4](https://github.com/mupq/pqm4) and [EFM32-getting-started](https://github.com/mkannwischer/EFM32-getting-started). 
-You may want to follow the more complete setup description of [EFM32-getting-started](https://github.com/mkannwischer/EFM32-getting-started). 
+This code is based upon [pqm4](https://github.com/mupq/pqm4) and [EFM32-getting-started](https://github.com/mkannwischer/EFM32-getting-started).
+You may want to follow the more complete setup description of [EFM32-getting-started](https://github.com/mkannwischer/EFM32-getting-started).
 
-As usual you will need the [arm-none-eabi toolchain](https://launchpad.net/gcc-arm-embedded) toolchain installed.
+As usual, you will need the [arm-none-eabi toolchain](https://launchpad.net/gcc-arm-embedded) toolchain installed.
 For flashing binaries onto the board, you will need to install the [J-Link Software and Documentation Pack](https://www.segger.com/downloads/jlink/). After installing, make sure that `JLinkExe` is in your `PATH`.
 
 For using the scripts you will need [Python](https://www.python.org/download) and [pyserial](https://pypi.org/project/pyserial/).
@@ -75,7 +75,7 @@ On Ubuntu, you can install [pyserial](https://pypi.org/project/pyserial/) and [a
 ```
 sudo apt install gcc-arm-none-eabi python3-serial
 ```
-You will have to have to install the [J-Link .deb](https://www.segger.com/downloads/jlink/) manually.
+You will have to install the [J-Link .deb](https://www.segger.com/downloads/jlink/) manually.
 
 
 ## Connecting the board
@@ -83,7 +83,7 @@ You will have to have to install the [J-Link .deb](https://www.segger.com/downlo
 Connect the board to your host machine using the mini-USB port (upper left corner of the board).
 This provides it with power, and allows you to flash binaries onto the board.
 
-It should show up in `lsusb` as `SEGGER J-Link OB`. 
+It should show up in `lsusb` as `SEGGER J-Link OB`.
 If you are using a UART-USB connector that has a PL2303 chip on board (which appears to be the most common),
 the driver should be loaded in your kernel by default. If it is not, it is typically called `pl2303`.
 On macOS, you will still need to [install it](http://www.prolific.com.tw/US/ShowProduct.aspx?p_id=229&pcid=41) (and reboot).
@@ -101,16 +101,16 @@ You can simply run
 
 ```
 ./flash.sh <BINARY>
-``` 
-e.g., 
+```
+e.g.,
 ```
 ./flash.sh bin/crypto_sign_rainbowI-classic_m4_test.bin
-``` 
+```
 to program the binary onto the board.
 For details see [flash.sh](flash.sh) and [flash.jlink](flash.jlink).
 
 
-# Running it 
+# Running it
 ## Parameter Sets
 We implement the three level 1 parameter sets `rainbowI-classic`, `rainbowI-circumzenithal`, `rainbowI-compressed`.
 
@@ -125,7 +125,7 @@ make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4 bin/crypto_sign_rainbow
 
 ## Implementations
 
-This code package includes our new `m4` implementation, but also the reference implementation `ref` from the Rainbow submission package. 
+This code package includes our new `m4` implementation, but also the reference implementation `ref` from the Rainbow submission package.
 You can select the implementation in the binary name and the path, e.g., for the reference implementation, run
 
 ```
@@ -169,9 +169,9 @@ PRECOMPUTE_BITSLICING=1 make IMPLEMENTATION_PATH=crypto_sign/rainbowI-classic/m4
 By default, it is disabled (0).
 
 
-## Automated tests and benchmarks 
+## Automated tests and benchmarks
 The above options can all be combined.
-To verify that all implementations produce the same testvestors as the reference implementations, you can run 
+To verify that all implementations produce the same testvestors as the reference implementations, you can run
 ```
 ./nistkat.py
 ```
